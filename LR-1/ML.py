@@ -16,13 +16,13 @@ import time
 class Config:
     DATASET_DIR = 'H:/Учеба/Projects/Deep-learning/LR-1/archive/animals/animals'
     VALID_EXTENSIONS = ('.png', '.jpg', '.jpeg')
-    IMG_SIZE = 128
-    BATCH_SIZE = 128      
+    IMG_SIZE = 224 #192
+    BATCH_SIZE = 64      
     VAL_SPLIT = 0.2   
     SEED = 42    
     # Параметры обучения
-    NUM_EPOCHS = 30
-    LEARNING_RATE = 0.001
+    NUM_EPOCHS = 70
+    LEARNING_RATE = 0.0001
     NUM_WORKERS = 8 # Количество потоков загрузки данных/как же я мучался с этим УЖАС работает только в .py
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -135,6 +135,7 @@ def train():
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
         transforms.ColorJitter(brightness=0.2, contrast=0.2), # Немного меняем цвета
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
@@ -287,8 +288,8 @@ def train():
     optimizer = optim.Adam(model.parameters(), lr=Config.LEARNING_RATE)
 
     # Добавим Scheduler опционально, но полезно для качества
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.1, patience=3, verbose=True)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+    optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
     print("Оптимизатор и функция потерь готовы.")
     print(f"Запуск обучения на {Config.NUM_EPOCHS} эпох")
     print(f"Устройство: {Config.DEVICE}")
