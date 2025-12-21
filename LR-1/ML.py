@@ -367,7 +367,7 @@ def train():
         # Сохранение лучшей модели
         if avg_val_acc > best_acc:
             best_acc = avg_val_acc
-            torch.save(model.state_dict(), "best_animal_model.pth")
+            torch.save(model.state_dict(), "H:/Учеба/Projects/Deep-learning/LR-1/best_animal_model.pth")
             save_msg = f"-> Saved Best ({best_acc:.2%})"
         else:
             save_msg = ""
