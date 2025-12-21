@@ -51,7 +51,7 @@ def create_dataset_metadata(base_dir):
     }) 
     return df
 
-def save_model_for_production(model, path="model.pth"):
+def save_model_for_production(model, path="H:/Учеба/Projects/Deep-learning/LR-1/model.pth"):
     print(f"Экспорт модели в {path}")
     model.eval()
     device = next(model.parameters()).device  # Запоминаем устройство
