@@ -21,9 +21,9 @@ class Config:
     VAL_SPLIT = 0.2   
     SEED = 42    
     # Параметры обучения
-    NUM_EPOCHS = 20
+    NUM_EPOCHS = 30
     LEARNING_RATE = 0.001
-    NUM_WORKERS = 4 # Количество потоков загрузки данных/как же я мучался с этим УЖАС работает только в .py
+    NUM_WORKERS = 8 # Количество потоков загрузки данных/как же я мучался с этим УЖАС работает только в .py
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def create_dataset_metadata(base_dir):
@@ -166,7 +166,7 @@ def train():
         num_workers=Config.NUM_WORKERS, 
         pin_memory=True,
         persistent_workers=True if Config.NUM_WORKERS > 0 else False,
-        prefetch_factor=2 if Config.NUM_WORKERS > 0 else None  # Загружает данные заранее
+        prefetch_factor=4 if Config.NUM_WORKERS > 0 else None  # Загружает данные заранее
     )
     print(Config.NUM_WORKERS)
     val_loader = DataLoader(
@@ -176,7 +176,7 @@ def train():
         num_workers=Config.NUM_WORKERS, 
         pin_memory=True,
         persistent_workers=True if Config.NUM_WORKERS > 0 else False,
-        prefetch_factor=2 if Config.NUM_WORKERS > 0 else None  # Загружает данные заранее
+        prefetch_factor=4 if Config.NUM_WORKERS > 0 else None  # Загружает данные заранее
     )
     print("DataLoaders готовы к работе.")
 
@@ -187,52 +187,83 @@ def train():
     class AnimalCNN(nn.Module):
         def __init__(self, num_classes):
             super(AnimalCNN, self).__init__()
-            # Извлекаем простые признаки (грани, углы)
-            # 128x128x3 -> 64x64x32
+            
+            # Блок 1: 128x128x3 -> 64x64x64
             self.conv1 = nn.Sequential(
-                nn.Conv2d(3, 32, kernel_size=3, padding=1),
-                nn.BatchNorm2d(32),
+                nn.Conv2d(3, 64, kernel_size=3, padding=1),
+                nn.BatchNorm2d(64),
                 nn.ReLU(),
-                nn.MaxPool2d(2, 2) 
-            )
-            # Текстуры и простые формы
-            # 64x64 -> 32x32
-            self.conv2 = nn.Sequential(
-                nn.Conv2d(32, 64, kernel_size=3, padding=1),
+                nn.Conv2d(64, 64, kernel_size=3, padding=1),  # Дополнительный слой
                 nn.BatchNorm2d(64),
                 nn.ReLU(),
                 nn.MaxPool2d(2, 2)
             )
-            # Сложные паттерны
-            # 32x32 -> 16x16
-            self.conv3 = nn.Sequential(
+            
+            # Блок 2: 64x64x64 -> 32x32x128
+            self.conv2 = nn.Sequential(
                 nn.Conv2d(64, 128, kernel_size=3, padding=1),
+                nn.BatchNorm2d(128),
+                nn.ReLU(),
+                nn.Conv2d(128, 128, kernel_size=3, padding=1),  # Дополнительный слой
                 nn.BatchNorm2d(128),
                 nn.ReLU(),
                 nn.MaxPool2d(2, 2)
             )
-            # Высокоуровневые признаки
-            # 16x16 -> 8x8
-            self.conv4 = nn.Sequential(
+            
+            # Блок 3: 32x32x128 -> 16x16x256
+            self.conv3 = nn.Sequential(
                 nn.Conv2d(128, 256, kernel_size=3, padding=1),
+                nn.BatchNorm2d(256),
+                nn.ReLU(),
+                nn.Conv2d(256, 256, kernel_size=3, padding=1),  # Дополнительный слой
                 nn.BatchNorm2d(256),
                 nn.ReLU(),
                 nn.MaxPool2d(2, 2)
             )
-            # Классификатор
+            
+            # Блок 4: 16x16x256 -> 8x8x512
+            self.conv4 = nn.Sequential(
+                nn.Conv2d(256, 512, kernel_size=3, padding=1),
+                nn.BatchNorm2d(512),
+                nn.ReLU(),
+                nn.Conv2d(512, 512, kernel_size=3, padding=1),  # Дополнительный слой
+                nn.BatchNorm2d(512),
+                nn.ReLU(),
+                nn.MaxPool2d(2, 2)
+            )
+            
+            # Блок 5 (новый): 8x8x512 -> 4x4x512
+            self.conv5 = nn.Sequential(
+                nn.Conv2d(512, 512, kernel_size=3, padding=1),
+                nn.BatchNorm2d(512),
+                nn.ReLU(),
+                nn.MaxPool2d(2, 2)
+            )
+            
+            # Global Average Pooling вместо полной свёртки
+            self.gap = nn.AdaptiveAvgPool2d((1, 1))
+            
+            # Классификатор (компактнее благодаря GAP)
             self.flatten = nn.Flatten()
             self.fc = nn.Sequential(
-                nn.Linear(256 * 8 * 8, 1024),
-                nn.BatchNorm1d(1024),
+                nn.Linear(512, 512),
+                nn.BatchNorm1d(512),
                 nn.ReLU(),
-                nn.Dropout(0.5), # Дропаем половину нейронов
-                nn.Linear(1024, num_classes)
+                nn.Dropout(0.5),
+                nn.Linear(512, 256),
+                nn.BatchNorm1d(256),
+                nn.ReLU(),
+                nn.Dropout(0.3),
+                nn.Linear(256, num_classes)
             )
+            
         def forward(self, x):
             x = self.conv1(x)
             x = self.conv2(x)
             x = self.conv3(x)
             x = self.conv4(x)
+            x = self.conv5(x)  
+            x = self.gap(x) 
             x = self.flatten(x)
             x = self.fc(x)
             return x
@@ -261,9 +292,10 @@ def train():
     print("Оптимизатор и функция потерь готовы.")
     print(f"Запуск обучения на {Config.NUM_EPOCHS} эпох")
     print(f"Устройство: {Config.DEVICE}")
-    print("-" * 80)
-    print(f"{'Epoch':^7} | {'Train Loss':^10} | {'Train Acc':^9} | {'Val Loss':^10} | {'Val Acc':^9} | {'LR':^9} | {'GPU Mem':^9}")
-    print("-" * 80)
+    print("-" * 95)
+    print(f"{'Epoch':^7} | {'Train Loss':^10} | {'Train Acc':^9} | {'Val Loss':^10} | {'Val Acc':^9} | {'LR':^9} | {'GPU Mem':^9} | {'Time':^7}")
+    print("-" * 95)
+
 
     history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
     best_acc = 0.0
@@ -339,13 +371,14 @@ def train():
         else:
             save_msg = ""
         print(next(model.parameters()).device)
+
         # Сколько памяти занято на GPU
         gpu_mem = torch.cuda.memory_allocated() / 1024**3 if torch.cuda.is_available() else 0
         epoch_time = time.time() - epoch_start
 
         print(f"{epoch+1:^7} | {avg_train_loss:^10.4f} | {avg_train_acc:^9.2%} | "
                 f"{avg_val_loss:^10.4f} | {avg_val_acc:^9.2%} | {current_lr:^9.1e} | "
-                f"{gpu_mem:^9.2f}GB {save_msg}")
+                f"{gpu_mem:^9.2f}GB | {epoch_time:^7.1f}s {save_msg}")
 
     total_duration = (time.time() - total_start) / 60
     print("-" * 80)
