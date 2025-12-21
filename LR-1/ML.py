@@ -17,13 +17,13 @@ class Config:
     DATASET_DIR = 'H:/Учеба/Projects/Deep-learning/LR-1/archive/animals/animals'
     VALID_EXTENSIONS = ('.png', '.jpg', '.jpeg')
     IMG_SIZE = 128
-    BATCH_SIZE = 128      
+    BATCH_SIZE = 64      
     VAL_SPLIT = 0.2   
     SEED = 42    
     # Параметры обучения
     NUM_EPOCHS = 20
     LEARNING_RATE = 0.001
-    NUM_WORKERS = 4 # Количество потоков загрузки данных/как же я мучался с этим УЖАС работает только в .py
+    NUM_WORKERS = 8 # Количество потоков загрузки данных/как же я мучался с этим УЖАС работает только в .py
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def create_dataset_metadata(base_dir):
