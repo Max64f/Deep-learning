@@ -21,7 +21,7 @@ class Config:
     VAL_SPLIT = 0.2   
     SEED = 42    
     # Параметры обучения
-    NUM_EPOCHS = 70
+    NUM_EPOCHS = 130
     LEARNING_RATE = 0.0001
     NUM_WORKERS = 8 # Количество потоков загрузки данных/как же я мучался с этим УЖАС работает только в .py
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
